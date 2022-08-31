@@ -1,13 +1,51 @@
+from pickle import FALSE, TRUE
 import requests 
 from bs4 import BeautifulSoup
 import pandas as pd 
+from os.path import exists
+import csv
 
-path = './Hosts arcanum - tz AOS 2k.html' 
+
+def clean_points_from_string ( input, key, json ):
+    
+    
+    json[ key ] = input 
+    n =  input
+    leftBracketIndex = n.rfind('[')
+    rightBracketIndex = n.rfind(']')
+    if leftBracketIndex != -1:
+        pts = n[ leftBracketIndex + 1 : rightBracketIndex ].replace('pts', '')
+        json[ f"{key}_pts"] = pts 
+        json[ key ] = n[ 0 : leftBracketIndex -1 ]
+
+def check_path ( new_path ):
+
+    if exists(new_path):
+        # path found, iterate until the
+        writeIndex = 1 ; 
+        while True :
+            path_no_extension = new_path[0:-3]
+            path = f"{path_no_extension}[{writeIndex}].csv"
+            writeIndex += 1
+            #print('trying ... ', path , exists(path) )
+            if exists(path) == False : 
+                return path ; 
+    else :
+        # use break to escape 
+        # print('path does not exist!', new_path )
+        return f"{new_path}"
+       
+
+
+
+     
+path = './Tzeentch AOS - current.html' 
 soup = BeautifulSoup(open(path, encoding="utf8"), "html.parser")
 #  <li class="category">
 categories = soup.find_all('li', class_='category')
 outputFolder = './output'
 arr = [] 
+cleanDataArray = [] 
 for cat in categories : 
 
     cat_title = cat.find('h3').get_text()
@@ -15,16 +53,11 @@ for cat in categories :
     selects = cat.find_all( 'li' , class_ ="rootselection" ) 
     for s in selects : 
         json = {} 
-        json['category_title'] = cat_title 
+        clean_points_from_string( cat_title , 'category_title', json )
+        #json['category_title'] = cat_title 
         json['select_name'] = s.find('h4').get_text()
-        n =  json['select_name']
-        json['name_clean'] = n 
-        leftBracketIndex = n.rfind('[')
-        rightBracketIndex = n.rfind(']')
-        if leftBracketIndex != -1:
-            pts = n[ leftBracketIndex + 1 : rightBracketIndex ].replace('pts', '')
-            json['points'] = pts 
-            json['name_clean'] = n[ 0 : leftBracketIndex -1 ]
+        json['tags'] = s.find('p', class_="category-names").get_text()
+        clean_points_from_string( json['select_name'] , 'select_name_clean', json )
         json['selections'] = s.find('p').get_text() #.replace(':', ':\n')
         # don't need this, just parse the tables- better data 
         #pn = s.find('p' , class_ ="profile-names")
@@ -36,7 +69,7 @@ for cat in categories :
         for t in sTables : 
             tableName = 'REPLACE_ME'
             listHeaders = list( t.find_all( 'th') ) 
-            tableName = json['name_clean'] + '_' + listHeaders[0].get_text()
+            tableName = json['select_name_clean'] + '_' + listHeaders[0].get_text() + '_table'
             data_array = [] ; 
             sTable_df = None 
             # need to just get the text from each <th> tag 
@@ -65,9 +98,13 @@ for cat in categories :
                 # print( json_row )
                 # ignore header row
                 if len(td) > 0 :
-                    data_array.append(json_row)     
+                    data_array.append(json_row)
+
+         
             sTable_df = pd.DataFrame( data_array ); 
-            sTable_df.to_csv ( f"{outputFolder}//{tableName}.csv" , index=False )
+            path = check_path( f"{outputFolder}/{tableName}.csv" ) 
+            sTable_df.to_csv ( path , index=False )
+            print( 'writing file out to ' , path )
                     
             #print ( tableName )
             tableName = 'REPLACE_ME'
@@ -77,9 +114,11 @@ for cat in categories :
     #arr.append( json )
 
 df = pd.DataFrame( arr ) 
-oPath =  f"./{outputFolder}/battlescribe_export.csv"
-df.to_csv(oPath , index=False)
-print('output to ' , oPath )
+oPath =  f"{outputFolder}/battlescribe_export.csv"
+oPath_checked = check_path( oPath )
+#df.to_csv(oPath_checked , index=False)
+df.to_csv(oPath_checked , index=False)
+print('output to ' , oPath_checked )
 #print(len(categories))
 #period = tonight.find(class_="period-name").get_text()
 
