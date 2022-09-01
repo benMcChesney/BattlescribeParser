@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import pandas as pd 
 from os.path import exists
 import csv
+import os 
 
 
 def clean_points_from_string ( input, key, json ):
@@ -44,6 +45,9 @@ soup = BeautifulSoup(open(path, encoding="utf8"), "html.parser")
 #  <li class="category">
 categories = soup.find_all('li', class_='category')
 outputFolder = './output'
+for f in os.listdir(outputFolder):
+    os.remove(os.path.join(outputFolder, f))
+
 arr = [] 
 cleanDataArray = [] 
 for cat in categories : 
@@ -89,7 +93,16 @@ for cat in categories :
                 for _data in td : 
                     #print('@ a row')
                     jr_key = headers[ dataIndex ]
-                    jr_value = _data.get_text()  
+                    # clean extra characters that mess up CSV export
+                    jr_value = _data.get_text().replace( ',' , '')
+                    jr_value = jr_value.replace("\\r", '')
+                    jr_value = jr_value.replace("\\t", '')
+                    jr_value = jr_value.replace("\\n", '')
+                    jr_value = jr_value.replace('    ', '')
+                    jr_value = jr_value.replace('''
+''', '')
+
+                    
                     json_row[ jr_key ] = jr_value 
                     
 
