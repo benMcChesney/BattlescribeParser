@@ -6,18 +6,27 @@ from os.path import exists
 import csv
 import os 
 
+import sys
 
-def clean_points_from_string ( input, key, json ):
-    
-    
-    json[ key ] = input 
-    n =  input
-    leftBracketIndex = n.rfind('[')
-    rightBracketIndex = n.rfind(']')
+
+def clean_points_from_string ( input ):
+    copy =  input
+    leftBracketIndex = copy.rfind('[')
+    rightBracketIndex = copy.rfind(']')
     if leftBracketIndex != -1:
-        pts = n[ leftBracketIndex + 1 : rightBracketIndex ].replace('pts', '')
-        json[ f"{key}_pts"] = pts 
-        json[ key ] = n[ 0 : leftBracketIndex -1 ]
+        str_replace = copy[ 0 : leftBracketIndex -1 ]
+        str_replace = str_replace.replace(':', ' -')
+        return str_replace
+    return copy
+
+def get_points_from_string ( input ):
+    copy =  input
+    leftBracketIndex = copy.rfind('[')
+    rightBracketIndex = copy.rfind(']')
+    if leftBracketIndex != -1:
+        pts = copy[ leftBracketIndex + 1 : rightBracketIndex ].replace('pts', '')
+        return pts
+    return ""
 
 def check_path ( new_path ):
 
@@ -40,7 +49,12 @@ def check_path ( new_path ):
 
 
      
-path = './Tzeentch AOS - current.html' 
+path = './Tzeentch AOS - next2.html' 
+if len( sys.argv) > 1 :
+    path = sys.argv[1]
+    print( f"loading html @ {path} ")
+
+
 soup = BeautifulSoup(open(path, encoding="utf8"), "html.parser")
 #  <li class="category">
 categories = soup.find_all('li', class_='category')
@@ -57,12 +71,21 @@ for cat in categories :
     selects = cat.find_all( 'li' , class_ ="rootselection" ) 
     for s in selects : 
         json = {} 
-        clean_points_from_string( cat_title , 'category_title', json )
+        json['category_title'] = clean_points_from_string( cat_title )
+        json['category_title_pts'] = get_points_from_string( cat_title )
         #json['category_title'] = cat_title 
-        json['select_name'] = s.find('h4').get_text()
+        nodeName = "REPLACE_NODE"
+        if s.find('h3') != None :
+            nodeName =  s.find('h3').get_text()
+        if s.find('h4') != None :
+            nodeName = s.find('h4').get_text()
+        json['select_name'] = nodeName
+        
         json['tags'] = s.find('p', class_="category-names").get_text()
-        clean_points_from_string( json['select_name'] , 'select_name_clean', json )
+        json['select_name_clean'] = clean_points_from_string( nodeName )
+        json['select_name_clean_pts'] = get_points_from_string( nodeName )
         json['selections'] = s.find('p').get_text() #.replace(':', ':\n')
+        json['profile_names'] = s.find('p',  class_="category-names").get_text()
         # don't need this, just parse the tables- better data 
         #pn = s.find('p' , class_ ="profile-names")
         #if pn != None:
@@ -97,10 +120,15 @@ for cat in categories :
                     jr_value = _data.get_text().replace( ',' , '')
                     jr_value = jr_value.replace("\\r", '')
                     jr_value = jr_value.replace("\\t", '')
-                    jr_value = jr_value.replace("\\n", '')
+                    #jr_value = jr_value.replace("\\n", '')
                     jr_value = jr_value.replace('    ', '')
-                    jr_value = jr_value.replace('''
+                    jr_value = jr_value.replace( '''. 
 ''', '')
+                    jr_value = jr_value.replace( '''.
+''' , '' )
+                    #jr_value = jr_value.replace('''
+#''', '')
+                    #jr_value = jr_value.replace('•', '|')
 
                     
                     json_row[ jr_key ] = jr_value 
